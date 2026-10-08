@@ -96,3 +96,6 @@ button{cursor:pointer}
 .sub{font-size:15px;font-weight:800;margin-top:4px}
 
 .photobtn{background:none;border:0;padding:0;border-radius:50%}
+
+.inbox{display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--sun);border:3px solid var(--ink);border-radius:14px;box-shadow:4px 4px 0 var(--ink)}
+.inbox .sub{margin:0}
