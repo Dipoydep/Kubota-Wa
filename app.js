@@ -37,6 +37,19 @@ async function claimPid(){
   try{const p=await newPid(),b=writeBatch(db);b.update(doc(db,"users",me.uid),{pid:p});b.set(doc(db,"ids",p),{uid:me.uid});await b.commit()}catch{}
   claiming=false;
 }
+let healing=false;
+async function healProfile(uid){
+  if(healing)return;healing=true;
+  try{
+    const tag=(auth.currentUser?.email||"").split("@")[0];
+    const pid=await newPid(),b=writeBatch(db);
+    b.set(doc(db,"users",uid),{tag,name:tag,photo:"",pid});
+    b.set(doc(db,"ids",pid),{uid});
+    await b.commit();
+    try{await setDoc(doc(db,"gamertags",tag),{uid})}catch{}
+  }catch{toast("Profil gagal dibuat, cek Firestore dan rules-nya")}
+  healing=false;
+}
 function saveCache(){
   if(!me)return;
   const keep=new Set([me.uid,...chats.flatMap(c=>c.members||[]),...contacts().map(c=>c.uid)]);
@@ -139,9 +152,9 @@ function boot(uid){
     renderHome();afterReqs();
   }
   unsubs.push(onSnapshot(doc(db,"users",uid),s=>{
-    if(!s.exists())return;
+    if(!s.exists()){healProfile(uid);return}
     me={uid,...s.data()};users.set(uid,me);renderHome();saveCache();if(!me.pid)claimPid();
-  }));
+  },()=>toast("Tidak bisa membaca profil, cek rules Firestore")));
   unsubs.push(onSnapshot(query(collection(db,"requests"),where("from","==",uid)),s=>{
     reqOut=s.docs.map(d=>({id:d.id,...d.data()}));afterReqs();
   },()=>toast("Gagal membaca permintaan teman")));
@@ -328,6 +341,7 @@ async function newGroupSheet(){
     <button class="btn" data-act="createGroup">Buat grup</button>`);
 }
 async function createGroup(){
+  if(!me)return toast("Profil belum siap, coba lagi sebentar");
   const name=$("#gName").value.trim();
   if(!name)return toast("Isi nama grup");
   const picked=[...document.querySelectorAll("#sheetBody input[type=checkbox]:checked")].map(i=>i.value);
@@ -384,6 +398,7 @@ async function leaveGroup(){
 /* ---------- profile ---------- */
 let tmpPhoto=null;
 $("#btnMe").onclick=()=>{
+  if(!me)return toast("Profil belum siap, coba lagi sebentar");
   tmpPhoto=null;
   sheet("me","Profil",`
     <div class="center"><button class="photobtn" data-act="pickPhoto" aria-label="Ganti foto"><span id="mePhoto">${av(me,"lg")}</span></button>
