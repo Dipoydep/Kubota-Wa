@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3ddc6a">
+<title>Kubota Wa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <section id="auth" class="view hidden">
+    <div class="auth-top">
+      <h1>Kubota Wa</h1>
+      <p>Chat pakai gamertag. Tanpa nomor HP.</p>
+    </div>
+    <form id="authForm" class="auth-card" autocomplete="off">
+      <div class="tabs">
+        <button type="button" id="tabLogin" class="tab on">Masuk</button>
+        <button type="button" id="tabReg" class="tab">Daftar</button>
+      </div>
+      <label class="field" id="nameField" hidden>Nama tampilan
+        <input id="fName" maxlength="30" placeholder="Nama kamu">
+      </label>
+      <label class="field">Gamertag
+        <span class="at"><i>@</i><input id="fTag" maxlength="20" placeholder="gamertagmu" autocapitalize="none" autocorrect="off"></span>
+      </label>
+      <label class="field">Kata sandi
+        <input id="fPass" type="password" placeholder="Minimal 6 karakter">
+      </label>
+      <button class="btn big" id="authBtn" type="submit">Masuk</button>
+    </form>
+  </section>
+
+  <section id="home" class="view hidden">
+    <header class="bar">
+      <h1>Kubota Wa</h1>
+      <button id="btnAdd" class="ib" aria-label="Tambah teman"></button>
+      <button id="btnMe" class="ib" aria-label="Profil"></button>
+    </header>
+    <div class="searchwrap"><input id="search" type="search" placeholder="Cari chat atau gamertag" autocomplete="off"></div>
+    <div id="chatList" class="list"></div>
+    <button id="fab" class="fab" aria-label="Chat baru"></button>
+  </section>
+
+  <section id="room" class="view">
+    <header class="bar">
+      <button id="back" class="ib" aria-label="Kembali"></button>
+      <div id="roomAv"></div>
+      <button id="roomHead" class="rtitle"><b id="roomTitle"></b><small id="roomSub"></small></button>
+    </header>
+    <div id="msgs"></div>
+    <form id="composer" autocomplete="off">
+      <input id="msgInput" placeholder="Tulis pesan" enterkeyhint="send">
+      <button class="send" type="submit">Kirim</button>
+    </form>
+  </section>
+
+  <div id="sheet" class="sheet hidden"><div id="sheetBody" class="sheet-body"></div></div>
+  <div id="toast" class="toast"></div>
+  <input type="file" id="photoIn" accept="image/*" hidden>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+  </html>
+  
