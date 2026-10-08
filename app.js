@@ -37,6 +37,7 @@ async function claimPid(){
   try{const p=await newPid(),b=writeBatch(db);b.update(doc(db,"users",me.uid),{pid:p});b.set(doc(db,"ids",p),{uid:me.uid});await b.commit()}catch{}
   claiming=false;
 }
+let bootErr="";
 let healing=false;
 async function healProfile(uid){
   if(healing)return;healing=true;
@@ -47,7 +48,7 @@ async function healProfile(uid){
     b.set(doc(db,"ids",pid),{uid});
     await b.commit();
     try{await setDoc(doc(db,"gamertags",tag),{uid})}catch{}
-  }catch{toast("Profil gagal dibuat, cek Firestore dan rules-nya")}
+  }catch(e){bootErr="Buat profil gagal: "+(e.code||e.message);renderHome();toast("Profil gagal dibuat")}
   healing=false;
 }
 function saveCache(){
@@ -145,6 +146,7 @@ function teardown(){
 function boot(uid){
   teardown();
   show("home");
+  bootErr="";renderHome();
   const cache=LS.get("cache:"+uid,null);
   if(cache&&cache.me){
     me=cache.me;(cache.users||[]).forEach(u=>users.set(u.uid,u));users.set(uid,me);
@@ -153,8 +155,8 @@ function boot(uid){
   }
   unsubs.push(onSnapshot(doc(db,"users",uid),s=>{
     if(!s.exists()){healProfile(uid);return}
-    me={uid,...s.data()};users.set(uid,me);renderHome();saveCache();if(!me.pid)claimPid();
-  },()=>toast("Tidak bisa membaca profil, cek rules Firestore")));
+    me={uid,...s.data()};users.set(uid,me);bootErr="";renderHome();saveCache();if(!me.pid)claimPid();
+  },e=>{bootErr="Baca profil gagal: "+(e.code||e.message);renderHome()}));
   unsubs.push(onSnapshot(query(collection(db,"requests"),where("from","==",uid)),s=>{
     reqOut=s.docs.map(d=>({id:d.id,...d.data()}));afterReqs();
   },()=>toast("Gagal membaca permintaan teman")));
@@ -168,7 +170,7 @@ function boot(uid){
   },()=>toast("Gagal membaca chat, cek rules Firestore")));
 }
 function afterReqs(){
-  saveCache();
+  saveCache();renderHome();
   const n=reqIn.filter(r=>r.status==="pending").length;
   $("#btnAdd").innerHTML=I.add+(n?`<span class="badge">${n}</span>`:"");
   if(sheetKind==="add")renderReqLists();
@@ -178,7 +180,10 @@ function afterReqs(){
 /* ---------- home ---------- */
 $("#btnAdd").innerHTML=I.add;$("#btnMe").innerHTML=I.me;$("#fab").innerHTML=I.plus;$("#back").innerHTML=I.back;
 async function renderHome(){
-  if(!me)return;
+  if(!me){
+    $("#chatList").innerHTML=`<div class="empty"><b>${bootErr?"Profil belum termuat":"Memuat profil…"}</b><br>${esc(bootErr)}${bootErr?`<br><br>Cek bahwa Firestore sudah dibuat dan rules sudah di-Publish.<br><br><button class="btn sm" data-act="retry">Coba lagi</button>`:""}</div>`;
+    return;
+  }
   const q=($("#search").value||"").trim().toLowerCase().replace(/^[@#]/,"");
   let list=chats.filter(c=>c.type==="group"||c.lastText).sort((a,b)=>ms(b.lastAt)-ms(a.lastAt));
   if(await loadUsers(list.filter(c=>c.type==="dm").map(otherOf)))return renderHome();
@@ -200,8 +205,15 @@ async function renderHome(){
     const more=cs.filter(c=>!shown.has(c.uid)).filter(c=>{const u=users.get(c.uid);return (u.name+" "+u.tag+" "+(u.pid||"")).toLowerCase().includes(q)});
     if(more.length)html+=`<h3 class="sub">Kontak</h3>`+more.map(c=>{const u=users.get(c.uid);return `<button class="item" data-act="dm" data-id="${c.uid}">${av(u)}<span class="grow"><b>${esc(u.name)}</b><small>@${esc(u.tag)}</small></span></button>`}).join("");
   }
-  $("#chatList").innerHTML=html||(q?`<div class="empty">Tidak ada hasil untuk "${esc(q)}".</div>`
+  const inc=q?[]:reqIn.filter(r=>r.status==="pending");
+  await loadUsers(inc.map(r=>r.from));
+  const inbox=inc.length?`<div class="inbox"><h3 class="sub">Permintaan teman (${inc.length})</h3>`+inc.map(r=>{
+    const u=users.get(r.from);
+    return `<div class="row">${av(u,"xs")}<span class="grow"><b>${esc(u?.name||"Pengguna")}</b><small>@${esc(r.fromTag)} ingin berteman</small></span><button class="btn sm" data-act="accept" data-id="${r.id}">Setuju</button><button class="btn sm ghost" data-act="reject" data-id="${r.id}">Tolak</button></div>`;
+  }).join("")+`</div>`:"";
+  const body=html||(q?`<div class="empty">Tidak ada hasil untuk "${esc(q)}".</div>`
     :`<div class="empty"><b>Belum ada chat.</b><br>Tambah teman lewat gamertag (ikon orang+ di atas), atau masuk grup pakai kode lewat tombol +.</div>`);
+  $("#chatList").innerHTML=inbox+body;
 }
 $("#search").oninput=()=>renderHome();
 
@@ -355,7 +367,7 @@ async function createGroup(){
     b.set(doc(db,"codes",code),{chatId:ref.id});
     await b.commit();
     closeSheet();openRoom(ref.id,{id:ref.id,type:"group",name,members:[me.uid,...picked],code});
-  }catch{toast("Grup gagal dibuat")}
+  }catch(e){toast("Grup gagal dibuat: "+(e.code||e.message))}
 }
 function joinSheet(){
   sheet("join","Masuk grup",`
@@ -373,7 +385,7 @@ async function doJoin(){
     await updateDoc(doc(db,"chats",id),{members:arrayUnion(me.uid)});
     closeSheet();toast("Berhasil masuk grup");
     openRoom(id,{id,type:"group",name:"Grup",members:[me.uid]});
-  }catch{toast("Gagal masuk grup")}
+  }catch(e){toast("Gagal masuk grup: "+(e.code||e.message))}
 }
 async function openGroupSettings(){
   const c=curChat();if(!c)return;
@@ -429,7 +441,7 @@ async function saveProfile(){
   if(!name)return toast("Nama tidak boleh kosong");
   const data={name};if(tmpPhoto!==null)data.photo=tmpPhoto;
   try{await updateDoc(doc(db,"users",me.uid),data);users.delete(me.uid);closeSheet();toast("Profil disimpan")}
-  catch{toast("Gagal menyimpan")}
+  catch(e){toast("Gagal menyimpan: "+(e.code||e.message))}
 }
 
 /* ---------- actions ---------- */
@@ -451,6 +463,7 @@ document.addEventListener("click",async e=>{
       try{await navigator.clipboard.writeText(curChat().code);toast("Kode disalin")}catch{toast("Tekan lama kode untuk menyalin")}break;
     case "copyId":
       try{await navigator.clipboard.writeText("#"+me.pid);toast("ID disalin")}catch{toast("Tekan lama ID untuk menyalin")}break;
+    case "retry":{const u=auth.currentUser;if(u){healing=false;bootErr="";boot(u.uid)}break}
     case "leave":leaveGroup();break;
     case "pickPhoto":$("#photoIn").click();break;
     case "saveProfile":saveProfile();break;
